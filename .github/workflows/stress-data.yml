@@ -1,4 +1,4 @@
-name: Sqpack-040000
+name: Sqpack-020000
 on:
   push:
     branches: [main, dev]
@@ -15,4 +15,4 @@ jobs:
         uses: ./
         with:
           output-path: data
-          regex: '^sqpack\/ffxiv\/040000\..+$'
+          regex: '^sqpack\/ffxiv\/020000\..+$'

@@ -19,6 +19,11 @@
       "commandName": "Project",
       "commandLineArgs": "--verbose -p \"./patch-data/\" graphviz -s 4e9a232b",
       "workingDirectory": "J:\\Code\\Projects\\ffxiv-downloader"
+    },
+    "Fix Crash": {
+      "commandName": "Project",
+      "commandLineArgs": "--verbose --debug -p \"./patch-data/\" download -s 6b936f08 -c \"cluts/6b936f08\" -o dl-xiv -f \"^sqpack\\/ex1\\/030100\\.win32\\.dat1$\"",
+      "workingDirectory": "J:\\Code\\Projects\\ffxiv-downloader"
     }
   }
 }

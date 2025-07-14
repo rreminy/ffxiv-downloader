@@ -19,7 +19,7 @@ inputs:
     default: "4"
   clut-path:
     description: "Path to a directory or base url where CLUT files can be retrieved from."
-    default: "https://raw.githubusercontent.com/WorkingRobot/ffxiv-downloader/refs/heads/main/cluts"
+    default: "https://raw.githubusercontent.com/WorkingRobot/ffxiv-lut/refs/heads/main/cluts"
   skip-cache:
     description: "Whether to skip making a .cachemeta.json file. Defaults to false. If true, downloads will always start from scratch."
     default: "false"
@@ -36,7 +36,7 @@ outputs:
     description: "Version of the repository after the update."
 runs:
   using: "docker"
-  image: "Dockerfile"
+  image: "docker://ghcr.io/WorkingRobot/ffxiv-downloader:v5"
   args:
     - "--gha"
     - "--verbose"

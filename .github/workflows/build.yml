@@ -1,0 +1,72 @@
+name: Build and Release
+on: push
+
+jobs:
+  build:
+    name: Build ${{matrix.name}}
+    strategy:
+      matrix:
+        include:
+        - id: windows
+          name: Windows
+          rid: win-x64
+        - id: linux
+          name: Linux
+          rid: linux-x64
+
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0"
+      
+      - name: Restore
+        run: dotnet restore -r ${{matrix.rid}} -p:ContinuousIntegrationBuild=true
+
+      - name: Build
+        run: dotnet build -c Release -r ${{matrix.rid}} --no-restore -p:ContinuousIntegrationBuild=true FFXIVDownloader.Command
+
+      - name: Publish
+        run: dotnet publish -c Release -r ${{matrix.rid}} --no-build -o build -p:ContinuousIntegrationBuild=true FFXIVDownloader.Command
+      
+      - name: Upload Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{matrix.id}}
+          path: build
+          if-no-files-found: error
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Download Linux Build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-linux
+          path: linux
+    
+      - name: Download Windows Build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-windows
+          path: windows
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with: 
+          files: |
+            linux/FFXIVDownloader.Command
+            windows/FFXIVDownloader.Command.exe

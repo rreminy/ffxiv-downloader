@@ -1,13 +1,13 @@
 name: EXD Files
 on:
-  push:
-    branches: [main, dev]
-    paths-ignore:
-      - 'README.md'
+  workflow_run:
+    workflows: ["Build Container"]
+    types: [completed]
 
 jobs:
   download:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v4
 

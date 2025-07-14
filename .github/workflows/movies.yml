@@ -1,9 +1,8 @@
 name: Movies
 on:
-  push:
-    branches: [main, dev]
-    paths-ignore:
-      - 'README.md'
+  workflow_run:
+    workflows: ["Build Container"]
+    types: [completed]
 
 jobs:
   download:

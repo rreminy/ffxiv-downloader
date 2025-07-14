@@ -39,7 +39,10 @@ When running this downloaded in a CI/CD environment, it's important to be aware 
   uses: actions/cache@v4
   with:
     path: exd-data
-    key: exd-files-data # Can be anything, as long as it doesn't conflict with any other cache key
+    # Use the .cachemeta.json file to invalidate the cache when the data changes.
+    key: exd-files-data-${{hashFiles('exd-data/.cachemeta.json')}}
+    restore-keys: |
+      exd-files-data-
 ```
 
 ## Inputs

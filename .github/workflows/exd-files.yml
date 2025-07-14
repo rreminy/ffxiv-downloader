@@ -16,7 +16,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: data
-          key: exd-files-data
+          key: exd-files-data-${{hashFiles('data/.cachemeta.json')}}
+          restore-keys: |
+            exd-files-data-
 
       - name: Run downloader
         uses: ./

@@ -48,7 +48,7 @@ public class ChainLutCommand
         ClutFile clut;
         if (BaseClut != null)
         {
-            using var httpStream = await patchClient.GetClutAsync(BaseClut, ParsedVersionString.Epoch, token).ConfigureAwait(false);
+            using var httpStream = await patchClient.GetClutAsync(BaseClut, GameVersion.Epoch, token).ConfigureAwait(false);
             using var bufferedStream = new BufferedStream(httpStream, 1 << 20);
 
             using var reader = new BinaryReader(bufferedStream);
@@ -65,32 +65,36 @@ public class ChainLutCommand
                 {
                     Compression = Compression,
                     Repository = Slug,
-                    Version = ParsedVersionString.Epoch,
+                    Version = GameVersion.Epoch,
+                    PatchVersion = PatchVersion.Epoch,
                     BasePatchUrl = BasePatchUrl
                 }
             };
 
-        foreach (var (ver, patch) in chain)
+        foreach (var (gameVer, patch) in chain)
         {
             var url = patch.Url;
+            var patchVer = patch.Version;
+
             // .patch is usually because we got the patch url from Thaliak
             if (Path.GetExtension(url) == ".patch")
-                url = Path.Join(BasePath, $"{ver:P}.lut");
+                url = Path.Join(BasePath, $"{patchVer}.lut");
             else if (!Path.IsPathRooted(url))
                 url = Path.Join(BasePath, url);
 
-            Log.Info($"Processing {ver}");
+            Log.Info($"Processing {gameVer}");
             Log.Verbose($"  URL: {url}");
 
-            using var httpStream = await patchClient.GetLutAsync(url, ver, token).ConfigureAwait(false);
+            using var httpStream = await patchClient.GetLutAsync(url, patchVer, token).ConfigureAwait(false);
             using var bufferedStream = new BufferedStream(httpStream, 1 << 20);
             using var reader = new BinaryReader(bufferedStream);
 
             clut.Header.Repository = Slug;
-            clut.Header.Version = ver;
+            clut.Header.Version = gameVer;
+            clut.Header.PatchVersion = patchVer;
             var lutFile = new LutFile(reader);
             foreach (var chunk in lutFile.Chunks)
-                clut.ApplyLut(ver, chunk);
+                clut.ApplyLut(patchVer, chunk);
 
             Log.Verbose("Optimizing");
             var n = Stopwatch.StartNew();
@@ -98,7 +102,7 @@ public class ChainLutCommand
             n.Stop();
             Log.Verbose($"Optimized in {n.Elapsed.TotalSeconds:0.00}s");
 
-            var fileName = $"{ver:P}.clut";
+            var fileName = $"{gameVer}.clut";
             var outPath = Path.Join(OutputPath, fileName);
             Log.Verbose($"Writing to {fileName}");
 

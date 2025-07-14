@@ -52,7 +52,7 @@ public class DownloadCommand
         Log.Verbose($"  Description: {meta.Description}");
         Log.Verbose($"  Latest Version: {meta.LatestVersion?.VersionString}");
 
-        var version = !string.IsNullOrWhiteSpace(Version) ? new ParsedVersionString(Version) : meta.LatestVersion!.VersionString;
+        var version = !string.IsNullOrWhiteSpace(Version) ? new GameVersion(Version) : meta.LatestVersion!.VersionString;
         Log.Info($"Downloading version {version}");
 
         Log.Verbose($"Downloading patch chain");
@@ -62,10 +62,10 @@ public class DownloadCommand
         if (cache.FilteredFiles.Any(RegexMatches))
             throw new InvalidOperationException("Some files were filtered out from previous patches. Please delete the output directory and try again.");
 
-        var installedVersion = ParsedVersionString.Epoch;
+        var installedVersion = GameVersion.Epoch;
         while (chain.Count > 0)
         {
-            if (cache.InstalledVersions.Contains(chain[0].Version.ToString("P")))
+            if (cache.InstalledVersions.Contains(chain[0].Version.ToString()))
             {
                 installedVersion = chain[0].Version;
                 Log.Info($"Skipping patch {chain[0].Version}");
@@ -84,7 +84,7 @@ public class DownloadCommand
 
         Log.Debug($"Chain:");
         foreach (var ver in chain)
-            Log.Debug($"  {ver.Version:P} - {ver.Patch.Url}");
+            Log.Debug($"  {ver.Version} - {ver.Patch.Url}");
 
         using var patchClient = new PatchClient(10);
 
@@ -105,7 +105,7 @@ public class DownloadCommand
                 len == path.Length
         );
 
-    private async Task TryDownloadFromClut(PatchClient patchClient, ParsedVersionString installedVersion, List<(ParsedVersionString Version, Patch Patch)> chain, CacheMetadata cache, CancellationToken token)
+    private async Task TryDownloadFromClut(PatchClient patchClient, GameVersion installedVersion, List<(GameVersion Version, Patch Patch)> chain, CacheMetadata cache, CancellationToken token)
     {
         if (chain.Count == 0)
             return;
@@ -119,16 +119,16 @@ public class DownloadCommand
         baseUrl = baseUrl[..(baseUrl.LastIndexOf('/') + 1)];
 
         ClutFile? installedClut = null;
-        if (installedVersion > ParsedVersionString.Epoch)
+        if (installedVersion > GameVersion.Epoch)
         {
-            using var stream = await patchClient.GetClutAsync($"{ClutPath}/{installedVersion:P}.clut", installedVersion, token).ConfigureAwait(false);
+            using var stream = await patchClient.GetClutAsync($"{ClutPath}/{installedVersion}.clut", installedVersion, token).ConfigureAwait(false);
             using var reader = new BinaryReader(stream);
             installedClut = new(reader);
         }
 
         ClutFile latestClut;
         {
-            using var stream = await patchClient.GetClutAsync($"{ClutPath}/{latestVersion:P}.clut", latestVersion, token).ConfigureAwait(false);
+            using var stream = await patchClient.GetClutAsync($"{ClutPath}/{latestVersion}.clut", latestVersion, token).ConfigureAwait(false);
             using var reader = new BinaryReader(stream);
             latestClut = new(reader);
         }
@@ -146,7 +146,7 @@ public class DownloadCommand
         var downloadSize = diff.AddedFiles.Values
             .SelectMany(
                 r => r
-                    .Where(p => p.Type is ClutDataRef.RefType.Patch or ClutDataRef.RefType.SplitPatch)
+                    .Where(p => p.Type == ClutDataRef.RefType.Patch)
                     .Select(p => p.Patch!.Value)
             )
             .Distinct()
@@ -174,7 +174,7 @@ public class DownloadCommand
         Log.Verbose($"Installed version {latestVersion}");
     }
 
-    private async Task TryDownloadFromRemote(PatchClient patchClient, List<(ParsedVersionString Version, Patch Patch)> chain, CacheMetadata cache, CancellationToken token)
+    private async Task TryDownloadFromRemote(PatchClient patchClient, List<(GameVersion Version, Patch Patch)> chain, CacheMetadata cache, CancellationToken token)
     {
         Log.Info($"Total Download Size: {chain.Sum(p => p.Patch.Size) / (double)(1 << 30):0.00} GiB");
 
@@ -184,7 +184,7 @@ public class DownloadCommand
             Log.Verbose($"  URL: {patch.Url}");
             Log.Verbose($"  Size: {patch.Size / (double)(1 << 20):0.00} MiB");
 
-            using var httpStream = await patchClient.GetPatchAsync(patch.Url, ver, token).ConfigureAwait(false);
+            using var httpStream = await patchClient.GetPatchAsync(patch.Url, patch.Version, token).ConfigureAwait(false);
             using var bufStream = new BufferedStream(httpStream, 1 << 20);
             using var patchStream = new PositionedStream(bufStream);
 

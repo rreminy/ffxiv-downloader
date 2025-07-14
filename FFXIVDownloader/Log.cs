@@ -9,7 +9,8 @@ public static class Log
     static Log()
     {
         JsonOptions = new JsonSerializerOptions { WriteIndented = true, IncludeFields = true };
-        JsonOptions.Converters.Add(new ParsedVersionString.JsonConverter());
+        JsonOptions.Converters.Add(new GameVersion.JsonConverter());
+        JsonOptions.Converters.Add(new PatchVersion.JsonConverter());
     }
 
     public static void Error(Exception e)

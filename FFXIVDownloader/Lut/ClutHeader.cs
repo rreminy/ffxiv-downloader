@@ -13,7 +13,8 @@ public sealed class ClutHeader
     public PlatformId Platform { get; init; }
 
     public required string Repository { get; set; }
-    public required ParsedVersionString Version { get; set; }
+    public required GameVersion Version { get; set; }
+    public required PatchVersion PatchVersion { get; set; }
     public required string? BasePatchUrl { get; set; }
 
     public int DecompressedSize { get; set; }
@@ -22,10 +23,11 @@ public sealed class ClutHeader
     [SetsRequiredMembers]
     public ClutHeader()
     {
-        FileVersion = ClutVersion.Initial;
+        FileVersion = ClutVersion.SeparateVersioning;
         Platform = PlatformId.Win32;
         Repository = "UNKNOWN";
-        Version = ParsedVersionString.Epoch;
+        Version = GameVersion.Epoch;
+        PatchVersion = PatchVersion.Epoch;
         BasePatchUrl = null;
     }
 
@@ -37,14 +39,15 @@ public sealed class ClutHeader
             throw new LutException($"Invalid magic: {magic:X4}");
 
         FileVersion = (ClutVersion)reader.ReadUInt16();
-        if (FileVersion != ClutVersion.Initial)
+        if (FileVersion != ClutVersion.SeparateVersioning)
             throw new LutException($"Unsupported version: {FileVersion}");
 
         Compression = (CompressType)reader.ReadByte();
         Platform = (PlatformId)reader.ReadByte();
 
         Repository = reader.ReadString();
-        Version = new ParsedVersionString(reader.ReadString());
+        Version = new GameVersion(reader.ReadString());
+        PatchVersion = new PatchVersion(reader.ReadString());
         BasePatchUrl = reader.ReadString();
         if (string.IsNullOrWhiteSpace(BasePatchUrl))
             BasePatchUrl = null;
@@ -61,7 +64,8 @@ public sealed class ClutHeader
         writer.Write((byte)Compression);
         writer.Write((byte)Platform);
         writer.Write(Repository);
-        writer.Write(Version.ToString("P"));
+        writer.Write(Version.ToString());
+        writer.Write(PatchVersion.ToString());
         writer.Write(BasePatchUrl ?? string.Empty);
         writer.Write(DecompressedSize);
         if (Compression != CompressType.None)

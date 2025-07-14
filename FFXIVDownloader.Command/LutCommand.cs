@@ -64,14 +64,15 @@ public class LutCommand
             MaxDegreeOfParallelism = Parallelism
         }, async (item, token) =>
         {
-            var (ver, patch) = item;
+            var (gameVer, patch) = item;
+            var patchVer = patch.Version;
 
-            Log.Info($"Downloading patch {ver}");
+            Log.Info($"Downloading patch {patchVer}");
             Log.Verbose($"  URL: {patch.Url}");
             if (patch.Size != 0)
                 Log.Verbose($"  Size: {patch.Size / (double)(1 << 20):0.00} MiB");
 
-            using var httpStream = await patchClient.GetPatchAsync(patch.Url, ver, token).ConfigureAwait(false);
+            using var httpStream = await patchClient.GetPatchAsync(patch.Url, patchVer, token).ConfigureAwait(false);
             using var bufferedStream = new BufferedStream(httpStream, 1 << 20);
             using var patchStream = new PositionedStream(bufferedStream);
 
@@ -80,7 +81,7 @@ public class LutCommand
                 Header = new LutHeader
                 {
                     Compression = Compression,
-                    Version = ver,
+                    Version = patchVer,
                     Repository = Slug
                 }
             };
@@ -94,7 +95,7 @@ public class LutCommand
                 }
             }
 
-            var fileName = $"{ver:P}.lut";
+            var fileName = $"{patchVer}.lut";
             var outPath = Path.Join(OutputPath, fileName);
             Log.Debug($"Writing to {fileName}");
 
@@ -113,17 +114,18 @@ public class LutCommand
             //     Log.DebugObject(lutFile2.Chunks);
             // }
 
-            Log.Verbose($"Finished {ver} ({fileSize / (double)(1 << 10):0.00} KiB)");
+            Log.Verbose($"Finished {patchVer} ({fileSize / (double)(1 << 10):0.00} KiB)");
         }).ConfigureAwait(false);
     }
 
-    public static async Task<List<(ParsedVersionString Version, Patch Patch)>> GetChainAsync(string[]? urls, string? slug, string? version, CancellationToken token)
+    public static async Task<List<(GameVersion Version, Patch Patch)>> GetChainAsync(string[]? urls, string? slug, string? gameVersion, CancellationToken token)
     {
         if (urls != null && urls.Length > 0)
         {
             return [.. urls.Select(url =>
             {
-                var version = new ParsedVersionString(Path.GetFileNameWithoutExtension(url));
+                var version = new GameVersion(Path.GetFileNameWithoutExtension(url));
+                Log.Warn($"Patch version {version} may not line up with the game version.");
                 var patch = new Patch
                 {
                     Url = url,
@@ -144,7 +146,7 @@ public class LutCommand
         Log.Verbose($"  Description: {meta.Description}");
         Log.Verbose($"  Latest Version: {meta.LatestVersion?.VersionString}");
 
-        var parsedVersion = version != null ? new ParsedVersionString(version) : meta.LatestVersion!.VersionString;
+        var parsedVersion = gameVersion != null ? new GameVersion(gameVersion) : meta.LatestVersion!.VersionString;
         Log.Info($"Using version {parsedVersion}");
 
         Log.Verbose($"Downloading patch chain");

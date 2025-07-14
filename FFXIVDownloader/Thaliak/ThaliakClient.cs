@@ -12,12 +12,12 @@ public sealed class ThaliakClient : IDisposable
 {
     private GraphQLHttpClient Client { get; }
 
-    private static FrozenDictionary<string, FrozenDictionary<ParsedVersionString, ParsedVersionString?>> Overrides { get; } =
-        new Dictionary<string, FrozenDictionary<ParsedVersionString, ParsedVersionString?>>
+    private static FrozenDictionary<string, FrozenDictionary<GameVersion, GameVersion?>> Overrides { get; } =
+        new Dictionary<string, FrozenDictionary<GameVersion, GameVersion?>>
         {
             // Global
             {
-                "4e9a232b", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "4e9a232b", new Dictionary<GameVersion, GameVersion?>{
                     // Thaliak incorrectly orders these hist patches.
                     // aa comes after z. It's not lexicographically sorted.
                     { new("2024.05.31.0000.0000"), new("H2024.05.31.0000.0000ag") },
@@ -35,80 +35,80 @@ public sealed class ThaliakClient : IDisposable
                 }.ToFrozenDictionary()
             },
             {
-                "6b936f08", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "6b936f08", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.05.31.0000.0000"), new("H2024.05.31.0000.0000d") }
                 }.ToFrozenDictionary()
             },
             {
-                "f29a3eb2", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "f29a3eb2", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.05.31.0000.0000"), new("H2024.05.31.0000.0000e") }
                 }.ToFrozenDictionary()
             },
             {
-                "859d0e24", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "859d0e24", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.05.31.0000.0000"), new("H2024.05.31.0000.0000g") }
                 }.ToFrozenDictionary()
             },
             {
-                "1bf99b87", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "1bf99b87", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.05.31.0000.0000"), new("H2024.05.31.0000.0000i") }
                 }.ToFrozenDictionary()
             },
 
             // Korea
             {
-                "de199059", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "de199059", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.11.02.0000.0000"), new("H2024.11.02.0000.0000ad") },
                     { new("H2024.11.02.0000.0000b"), new("H2024.11.02.0000.0000a") },
                     { new("H2024.11.02.0000.0000aa"), new("H2024.11.02.0000.0000z") },
                 }.ToFrozenDictionary()
             },
             {
-                "573d8c07", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "573d8c07", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.10.22.0002.0000"), new("H2024.10.22.0002.0000c") },
                 }.ToFrozenDictionary()
             },
             {
-                "ce34ddbd", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "ce34ddbd", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.10.22.0003.0000"), new("H2024.10.22.0003.0000e") },
                 }.ToFrozenDictionary()
             },
             {
-                "b933ed2b", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "b933ed2b", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.11.02.0000.0000"), new("H2024.11.02.0000.0000f") },
                 }.ToFrozenDictionary()
             },
             {
-                "27577888", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "27577888", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.11.02.0000.0000"), new("H2024.11.02.0000.0000g") },
                 }.ToFrozenDictionary()
             },
 
             // China
             {
-                "c38effbc", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "c38effbc", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.09.09.0000.0000"), new("H2024.09.09.0000.0000ad") },
                     { new("H2024.09.09.0000.0000b"), new("H2024.09.09.0000.0000a") },
                     { new("H2024.09.09.0000.0000aa"), new("H2024.09.09.0000.0000z") },
                 }.ToFrozenDictionary()
             },
             {
-                "77420d17", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "77420d17", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.08.27.0002.0000"), new("H2024.08.27.0002.0000c") },
                 }.ToFrozenDictionary()
             },
             {
-                "ee4b5cad", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "ee4b5cad", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.08.27.0003.0000"), new("H2024.08.27.0003.0000e") },
                 }.ToFrozenDictionary()
             },
             {
-                "994c6c3b", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "994c6c3b", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.09.09.0000.0000"), new("H2024.09.09.0000.0000f") },
                 }.ToFrozenDictionary()
             },
             {
-                "0728f998", new Dictionary<ParsedVersionString, ParsedVersionString?>{
+                "0728f998", new Dictionary<GameVersion, GameVersion?>{
                     { new("2024.09.09.0000.0000"), new("H2024.09.09.0000.0000g") },
                 }.ToFrozenDictionary()
             },
@@ -148,7 +148,7 @@ public sealed class ThaliakClient : IDisposable
     public ThaliakClient()
     {
         var serializer = new SystemTextJsonSerializer();
-        serializer.Options.Converters.Add(new ParsedVersionString.JsonConverter());
+        serializer.Options.Converters.Add(new GameVersion.JsonConverter());
         Client = new("https://thaliak.xiv.dev/graphql/2022-08-14", serializer);
     }
 
@@ -173,7 +173,7 @@ public sealed class ThaliakClient : IDisposable
         }, token).ConfigureAwait(false)).Data.Repository;
     }
 
-    public async Task<List<(ParsedVersionString Version, Patch Patch)>> GetPatchChainAsync(string slug, ParsedVersionString version, CancellationToken token = default)
+    public async Task<List<(GameVersion Version, Patch Patch)>> GetPatchChainAsync(string slug, GameVersion version, CancellationToken token = default)
     {
         var versionList = (await Client.SendQueryAsync<RepositoryResponse>(new GraphQLRequest
         {
@@ -210,7 +210,7 @@ public sealed class ThaliakClient : IDisposable
 
         var overrides = Overrides.GetValueOrDefault(slug);
 
-        var ret = new List<(ParsedVersionString, Patch)>();
+        var ret = new List<(GameVersion, Patch)>();
 
         var nextVer = versions.GetValueOrDefault(version);
         while (nextVer != null)

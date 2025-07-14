@@ -3,6 +3,7 @@ using FFXIVDownloader.Thaliak;
 using FFXIVDownloader.ZiPatch.Config;
 using FFXIVDownloader.ZiPatch.Util;
 using System.Buffers;
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
@@ -60,12 +61,24 @@ public sealed class ClutPatcher : IDisposable
         public PatchSection Interval { get; } = interval;
         public ReadOnlyMemory<byte> Data { get; } = fileData;
 
-        public static async Task<PatchIntervalData> CreateAsync(PatchSection interval, ClutPatchRef patchRef, ReadOnlyMemory<byte> patchData, CancellationToken token = default)
+        public static async Task<PatchIntervalData> CreateAsync(PatchSection interval, ClutPatchRef patchRef, ReadOnlyMemory<byte> patchData, ClutDataRef dataRef, CancellationToken token = default)
         {
             if (patchRef.Size != patchData.Length)
                 throw new ArgumentException("Invalid patch data size", nameof(patchData));
             if (patchRef.IsCompressed)
-                return new(interval, await DecompressAsync(patchData, token).ConfigureAwait(false));
+            {
+                try
+                {
+                    return new(interval, await DecompressAsync(patchData, token).ConfigureAwait(false));
+                }
+                catch (Exception)
+                {
+                    Log.Warn($"CreateAsync DEBUG: First 128/{patchData.Length} bytes of compressed data: {Convert.ToHexString(patchData.Span[..128])}");
+                    Log.Warn($"CreateAsync DEBUG: PatchRef: Offset={patchRef.Offset}, Size={patchRef.Size}, IsCompressed={patchRef.IsCompressed}");
+                    Log.Warn($"CreateAsync DEBUG: DataRef: Type={dataRef.Type}, Version={dataRef.AppliedVersion}, Offset={dataRef.Offset}, Length={dataRef.Length}");
+                    throw;
+                }
+            }
             return new(interval, patchData);
         }
 
@@ -119,16 +132,14 @@ public sealed class ClutPatcher : IDisposable
     private static async ValueTask ApplyDataRefAsync(ZiPatchConfig config, string path, ClutDataRef dataRef, ReadOnlyMemory<byte>? patchData = null, CancellationToken token = default)
     {
         var file = await config.OpenFile(path).ConfigureAwait(false);
-        if (dataRef.Type is ClutDataRef.RefType.Patch or ClutDataRef.RefType.SplitPatch)
+        if (dataRef.Type == ClutDataRef.RefType.Patch)
         {
             if (!patchData.HasValue)
                 throw new ArgumentNullException(nameof(patchData));
 
             var patchBuffer = patchData.Value;
 
-            var offset = 0;
-            if (dataRef.Type == ClutDataRef.RefType.SplitPatch)
-                offset = dataRef.PatchOffset!.Value;
+            var offset = dataRef.PatchOffset ?? 0;
 
             ArgumentOutOfRangeException.ThrowIfLessThan(patchBuffer.Length, offset + dataRef.Length, nameof(patchData));
             patchBuffer = patchBuffer.Slice(offset, dataRef.Length);
@@ -159,7 +170,7 @@ public sealed class ClutPatcher : IDisposable
                 .ToArray();
 
             var nonDownloadDataRefsEnum = allRefs
-                .Where(f => GetRef(f).Type is not (ClutDataRef.RefType.Patch or ClutDataRef.RefType.SplitPatch));
+                .Where(f => GetRef(f).Type != ClutDataRef.RefType.Patch);
             nonDownloadDataRefCount = nonDownloadDataRefsEnum.Count();
             nonDownloadDataRefs = nonDownloadDataRefsEnum.GetEnumerator();
 
@@ -181,7 +192,7 @@ public sealed class ClutPatcher : IDisposable
             foreach (var dataRef in allRefs)
             {
                 var patch = GetRef(dataRef);
-                if (patch.Type is not ClutDataRef.RefType.Patch and not ClutDataRef.RefType.SplitPatch)
+                if (patch.Type != ClutDataRef.RefType.Patch)
                     continue;
                 var section = new PatchSection(dataRef);
                 if (!downloadDataRefs.TryGetValue(section, out var list))
@@ -264,7 +275,7 @@ public sealed class ClutPatcher : IDisposable
                 token));
     }
 
-    private ValueTask GetPatchesFromVersionAsync(ParsedVersionString version, IEnumerable<PatchSection> parts, Func<PatchIntervalData, CancellationToken, ValueTask> onRangeRecieved, CancellationToken token = default)
+    private ValueTask GetPatchesFromVersionAsync(PatchVersion version, IEnumerable<PatchSection> parts, Func<PatchIntervalData, CancellationToken, ValueTask> onRangeRecieved, CancellationToken token = default)
     {
         Log.Info($"Partially downloading {version}");
 
@@ -306,7 +317,9 @@ public sealed class ClutPatcher : IDisposable
             ranges, token,
             async (range, token) =>
             {
-                await foreach (var (contentRange, stream) in Client.GetPatchRangedAsync($"{BasePatchUrl}/{version:P}.patch", version, range.Header, token).WithCancellation(token).ConfigureAwait(false))
+                var url = new Uri(BasePatchUrl, $"{version}.patch").ToString();
+                Log.Info($"Downloading {url} with range {range.Header}");
+                await foreach (var (contentRange, stream) in Client.GetPatchRangedAsync(url, version, range.Header, token).WithCancellation(token).ConfigureAwait(false))
                 {
                     await foreach (var interval in ProcessStreamIntervalsAsync(contentRange.From!.Value, stream, range.MergedRanges.First(r => r.Offset == contentRange.From!.Value).Parts, token).WithCancellation(token))
                         await onRangeRecieved(interval, token).ConfigureAwait(false);
@@ -364,18 +377,8 @@ public sealed class ClutPatcher : IDisposable
             // Read the entire union segment.
             var unionLength = (int)(unionEnd - unionStart);
             var unionBuffer = new byte[unionLength];
-            var offset = 0;
-            while (offset < unionLength)
-            {
-                var read = await stream.ReadAsync(unionBuffer.AsMemory(offset, unionLength - offset), token).ConfigureAwait(false);
-                if (read == 0)
-                {
-                    // End of stream reached unexpectedly.
-                    break;
-                }
-                offset += read;
-                currentPos += read;
-            }
+            await stream.ReadExactlyAsync(unionBuffer, token).ConfigureAwait(false);
+            currentPos += unionLength;
 
             // Yield each interval from the union by slicing the unionBuffer.
             foreach (var patch in unionIntervals)
@@ -383,12 +386,12 @@ public sealed class ClutPatcher : IDisposable
                 var p = GetPatch(patch);
                 var relativeStart = (int)(p.Offset - unionStart);
                 var relativeLength = p.Size;
-                yield return await PatchIntervalData.CreateAsync(patch, p, unionBuffer.AsMemory(relativeStart, relativeLength), token).ConfigureAwait(false);
+                yield return await PatchIntervalData.CreateAsync(patch, p, unionBuffer.AsMemory(relativeStart, relativeLength), GetRef(patch.DataRef), token).ConfigureAwait(false);
             }
         }
     }
 
-    private ParsedVersionString GetPatchVersion(PatchSection section) =>
+    private PatchVersion GetPatchVersion(PatchSection section) =>
         GetRef(section.DataRef).AppliedVersion;
 
     private ClutPatchRef GetPatch(PatchSection section) =>

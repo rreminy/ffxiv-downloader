@@ -2,7 +2,7 @@ namespace FFXIVDownloader.Thaliak;
 
 public record Version
 {
-    public required ParsedVersionString VersionString { get; init; }
+    public required GameVersion VersionString { get; init; }
 }
 
 public sealed record AnnotatedVersion : Version

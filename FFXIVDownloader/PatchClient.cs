@@ -34,23 +34,23 @@ public sealed class PatchClient : IDisposable
         ConnectionSemaphore = new(maxConnections);
     }
 
-    public Task<Stream> GetClutAsync(string url, ParsedVersionString version, CancellationToken token = default) =>
-        GetResourceAsync(url, version, "clut", token);
+    public Task<Stream> GetClutAsync(string url, GameVersion version, CancellationToken token = default) =>
+        GetResourceAsync(url, $"{version}", "clut", token);
 
-    public Task<Stream> GetLutAsync(string url, ParsedVersionString version, CancellationToken token = default) =>
-        GetResourceAsync(url, version, "lut", token);
+    public Task<Stream> GetLutAsync(string url, PatchVersion version, CancellationToken token = default) =>
+        GetResourceAsync(url, $"{version}", "lut", token);
 
-    public Task<Stream> GetPatchAsync(string url, ParsedVersionString version, CancellationToken token = default) =>
-        GetResourceAsync(url, version, "patch", token);
+    public Task<Stream> GetPatchAsync(string url, PatchVersion version, CancellationToken token = default) =>
+        GetResourceAsync(url, $"{version}", "patch", token);
 
-    public IAsyncEnumerable<(ContentRangeHeaderValue Range, Stream Stream)> GetPatchRangedAsync(string url, ParsedVersionString version, RangeHeaderValue ranges, CancellationToken token = default) =>
-        GetResourceRangedAsync(url, version, "patch", ranges, token);
+    public IAsyncEnumerable<(ContentRangeHeaderValue Range, Stream Stream)> GetPatchRangedAsync(string url, PatchVersion version, RangeHeaderValue ranges, CancellationToken token = default) =>
+        GetResourceRangedAsync(url, $"{version}", "patch", ranges, token);
 
-    public async Task<Stream> GetResourceAsync(string url, ParsedVersionString version, string extension, CancellationToken token = default)
+    public async Task<Stream> GetResourceAsync(string url, string version, string extension, CancellationToken token = default)
     {
         if (OverridePath != null)
         {
-            var filePath = Path.Join(OverridePath, $"{version:P}.{extension}");
+            var filePath = Path.Join(OverridePath, $"{version}.{extension}");
             if (File.Exists(filePath))
             {
                 Log.Info($"Using override for {version}");
@@ -69,11 +69,11 @@ public sealed class PatchClient : IDisposable
     }
 
 
-    private async IAsyncEnumerable<(ContentRangeHeaderValue Range, Stream Stream)> GetResourceRangedAsync(string url, ParsedVersionString version, string extension, RangeHeaderValue ranges, [EnumeratorCancellation] CancellationToken token = default)
+    private async IAsyncEnumerable<(ContentRangeHeaderValue Range, Stream Stream)> GetResourceRangedAsync(string url, string version, string extension, RangeHeaderValue ranges, [EnumeratorCancellation] CancellationToken token = default)
     {
         if (OverridePath != null)
         {
-            var filePath = Path.Join(OverridePath, $"{version:P}.{extension}");
+            var filePath = Path.Join(OverridePath, $"{version}.{extension}");
             if (File.Exists(filePath))
             {
                 Log.Info($"Using override for {version}");
@@ -111,7 +111,7 @@ public sealed class PatchClient : IDisposable
         }
     }
 
-    private async IAsyncEnumerable<(ContentRangeHeaderValue Range, Stream Stream)> GetRangedHttpAsync(string url, ParsedVersionString version, RangeHeaderValue ranges, int backoffIdx, [EnumeratorCancellation] CancellationToken token)
+    private async IAsyncEnumerable<(ContentRangeHeaderValue Range, Stream Stream)> GetRangedHttpAsync(string url, string version, RangeHeaderValue ranges, int backoffIdx, [EnumeratorCancellation] CancellationToken token)
     {
         if (backoffIdx >= BackoffDelays.Length)
             throw new InvalidOperationException("Failed to download range");

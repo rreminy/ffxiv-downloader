@@ -6,8 +6,8 @@ public sealed class ClutDiff
 {
     public string Repository { get; }
     public string? BasePatchUrl { get; }
-    public ParsedVersionString VersionFrom { get; }
-    public ParsedVersionString VersionTo { get; }
+    public GameVersion VersionFrom { get; }
+    public GameVersion VersionTo { get; }
 
     public HashSet<string> RemovedFolders { get; }
     public HashSet<string> RemovedFiles { get; }
@@ -20,7 +20,7 @@ public sealed class ClutDiff
         Header = new ClutHeader
         {
             Repository = toFile.Header.Repository,
-            Version = ParsedVersionString.Epoch
+            Version = GameVersion.Epoch
         }
     }, toFile)
     {
@@ -59,7 +59,7 @@ public sealed class ClutDiff
                 continue;
             }
 
-            var newData = toData.Data.Where(d => d.AppliedVersion > VersionFrom).ToList();
+            var newData = toData.Data.Where(d => d.AppliedVersion > fromFile.Header.PatchVersion).ToList();
             if (newData.Count > 0)
                 AddedFiles.Add(path, newData);
         }

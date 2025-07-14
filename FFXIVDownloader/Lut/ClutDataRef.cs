@@ -13,11 +13,11 @@ public struct ClutDataRef : IEquatable<ClutDataRef>
         Patch = 0,
         Zero = 1,
         EmptyBlock = 2,
-        SplitPatch = 3,
+        _FullPatch = 0xFF,
     }
 
     public RefType Type { get; init; }
-    public ParsedVersionString AppliedVersion { get; init; }
+    public PatchVersion AppliedVersion { get; init; }
     public long Offset { get; set; }
     public int Length { get; set; }
     public int? BlockCount { get; init; }
@@ -36,15 +36,20 @@ public struct ClutDataRef : IEquatable<ClutDataRef>
         Length = 0;
     }
 
-    public ClutDataRef(BinaryReader reader, ReadOnlySpan<ParsedVersionString> patchMap, ref long patchOffset)
+    public ClutDataRef(BinaryReader reader, ReadOnlySpan<PatchVersion> patchMap, ref long patchOffset)
     {
-        Type = (RefType)reader.ReadByte();
+        var type = (RefType)reader.ReadByte();
+        if (type == RefType._FullPatch)
+            Type = RefType.Patch;
+        else
+            Type = type;
+
         AppliedVersion = patchMap[reader.Read7BitEncodedInt()];
         if (Type == RefType.EmptyBlock)
             BlockCount = reader.ReadInt32();
-        if (Type is RefType.Patch or RefType.SplitPatch)
+        if (Type == RefType.Patch)
             Patch = new(reader, ref patchOffset);
-        if (Type == RefType.SplitPatch)
+        if (type == RefType.Patch)
             PatchOffset = reader.Read7BitEncodedInt();
     }
 
@@ -60,15 +65,19 @@ public struct ClutDataRef : IEquatable<ClutDataRef>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public readonly void Write(BinaryWriter writer, FrozenDictionary<ParsedVersionString, int> patchMap, ref long patchOffset)
+    public readonly void Write(BinaryWriter writer, FrozenDictionary<PatchVersion, int> patchMap, ref long patchOffset)
     {
-        writer.Write((byte)Type);
+        var type = Type;
+        if (Type == RefType.Patch && (PatchOffset ?? 0) == 0)
+            type = RefType._FullPatch;
+
+        writer.Write((byte)type);
         writer.Write7BitEncodedInt(patchMap[AppliedVersion]);
         if (Type == RefType.EmptyBlock)
             writer.Write(BlockCount!.Value);
-        if (Type is RefType.Patch or RefType.SplitPatch)   
+        if (Type == RefType.Patch)
             Patch!.Value.Write(writer, ref patchOffset);
-        if (Type == RefType.SplitPatch)
+        if (type == RefType.Patch)
             writer.Write7BitEncodedInt(PatchOffset ?? 0);
     }
 
@@ -110,7 +119,7 @@ public struct ClutDataRef : IEquatable<ClutDataRef>
 
     public static bool operator !=(ClutDataRef left, ClutDataRef right) => !left.Equals(right);
 
-    public static ClutDataRef FromRawPatchData(ParsedVersionString version, long patchOffset, long fileOffset, int length)
+    public static ClutDataRef FromRawPatchData(PatchVersion version, long patchOffset, long fileOffset, int length)
     {
         return new ClutDataRef
         {
@@ -118,6 +127,7 @@ public struct ClutDataRef : IEquatable<ClutDataRef>
             AppliedVersion = version,
             Offset = fileOffset,
             Length = length,
+            PatchOffset = 0,
             Patch = new ClutPatchRef
             {
                 Offset = patchOffset,
@@ -127,7 +137,7 @@ public struct ClutDataRef : IEquatable<ClutDataRef>
         };
     }
 
-    public static ClutDataRef FromZeros(ParsedVersionString version, long fileOffset, int length)
+    public static ClutDataRef FromZeros(PatchVersion version, long fileOffset, int length)
     {
         return new ClutDataRef
         {
@@ -139,7 +149,7 @@ public struct ClutDataRef : IEquatable<ClutDataRef>
         };
     }
 
-    public static (ClutDataRef, ClutDataRef?) FromEmpty(ParsedVersionString version, long fileOffset, int length)
+    public static (ClutDataRef, ClutDataRef?) FromEmpty(PatchVersion version, long fileOffset, int length)
     {
         if ((length & 0x7F) != 0)
             throw new ArgumentException("Length must be a multiple of 128", nameof(length));
@@ -167,7 +177,7 @@ public struct ClutDataRef : IEquatable<ClutDataRef>
         return (empty, zero);
     }
 
-    public static ClutDataRef FromCompressedPatchData(ParsedVersionString version, long patchOffset, long fileOffset, int compressedLength, int length)
+    public static ClutDataRef FromCompressedPatchData(PatchVersion version, long patchOffset, long fileOffset, int compressedLength, int length)
     {
         return new ClutDataRef
         {
@@ -175,6 +185,7 @@ public struct ClutDataRef : IEquatable<ClutDataRef>
             AppliedVersion = version,
             Offset = fileOffset,
             Length = length,
+            PatchOffset = 0,
             Patch = new ClutPatchRef
             {
                 Offset = patchOffset,
@@ -186,11 +197,11 @@ public struct ClutDataRef : IEquatable<ClutDataRef>
 
     // fileOffset is the offset to write to the file
     // patchFileOffset is the offset of the uncompressed data in the patch
-    public static ClutDataRef FromSplitPatchData(ParsedVersionString version, ClutPatchRef patch, long fileOffset, int patchOffset, int length)
+    public static ClutDataRef FromSplitPatchData(PatchVersion version, ClutPatchRef patch, long fileOffset, int patchOffset, int length)
     {
         return new ClutDataRef
         {
-            Type = RefType.SplitPatch,
+            Type = RefType.Patch,
             AppliedVersion = version,
             Offset = fileOffset,
             Length = length,
@@ -204,12 +215,15 @@ public struct ClutDataRef : IEquatable<ClutDataRef>
 
     public static ClutDataRef FromSlice(ref readonly ClutDataRef source, long fileOffset, int length)
     {
+        // Validate slice bounds
+        if (fileOffset < source.Offset || fileOffset + length > source.End)
+            throw new ArgumentException($"Slice bounds ({fileOffset}-{fileOffset + length}) are outside source bounds ({source.Offset}-{source.End})");
+
         return source.Type switch
         {
             RefType.Zero => FromZeros(source.AppliedVersion, fileOffset, length),
             RefType.EmptyBlock => throw new InvalidOperationException("Cannot slice an EmptyBlock"),
-            RefType.Patch => FromSplitPatchData(source.AppliedVersion, source.Patch!.Value, fileOffset, checked((int)(fileOffset - source.Offset)), length),
-            RefType.SplitPatch => FromSplitPatchData(source.AppliedVersion, source.Patch!.Value, fileOffset, checked((int)(fileOffset - source.Offset + source.PatchOffset!.Value)), length),
+            RefType.Patch => FromSplitPatchData(source.AppliedVersion, source.Patch!.Value, fileOffset, checked((int)(fileOffset - source.Offset + source.PatchOffset!.Value)), length),
             _ => throw new InvalidOperationException("Unknown RefType"),
         };
     }

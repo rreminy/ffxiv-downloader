@@ -11,14 +11,14 @@ public sealed class LutHeader
     public CompressType Compression { get; init; }
 
     public required string Repository { get; set; }
-    public required ParsedVersionString Version { get; set; }
+    public required PatchVersion Version { get; set; }
 
     [SetsRequiredMembers]
     public LutHeader()
     {
-        FileVersion = LutVersion.Initial;
+        FileVersion = LutVersion.SeparateVersioning;
         Repository = "UNKNOWN";
-        Version = ParsedVersionString.Epoch;
+        Version = PatchVersion.Epoch;
     }
 
     [SetsRequiredMembers]
@@ -29,13 +29,13 @@ public sealed class LutHeader
             throw new LutException($"Invalid magic: {magic:X4}");
 
         FileVersion = (LutVersion)reader.ReadUInt16();
-        if (FileVersion != LutVersion.Initial)
+        if (FileVersion != LutVersion.SeparateVersioning)
             throw new LutException($"Unsupported version: {FileVersion}");
 
         Compression = (CompressType)reader.ReadByte();
 
         Repository = reader.ReadString();
-        Version = new ParsedVersionString(reader.ReadString());
+        Version = new PatchVersion(reader.ReadString());
     }
 
     public void Write(BinaryWriter writer)

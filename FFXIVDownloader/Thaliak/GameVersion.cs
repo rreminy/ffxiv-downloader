@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace FFXIVDownloader.Thaliak;
 
-public readonly record struct ParsedVersionString : IComparable<ParsedVersionString>, IEquatable<ParsedVersionString>, IFormattable
+public readonly record struct GameVersion : IComparable<GameVersion>, IEquatable<GameVersion>, IFormattable
 {
     public int Year { get; init; }
     public int Month { get; init; }
@@ -14,9 +14,9 @@ public readonly record struct ParsedVersionString : IComparable<ParsedVersionStr
     public bool IsHistoric { get; init; }
     public string? Section { get; init; }
 
-    public static readonly ParsedVersionString Epoch = new("2012.01.01.0000.0000");
+    public static readonly GameVersion Epoch = new("2012.01.01.0000.0000");
 
-    public ParsedVersionString(string versionString)
+    public GameVersion(string versionString)
     {
         if (versionString.StartsWith('H'))
         {
@@ -47,7 +47,7 @@ public readonly record struct ParsedVersionString : IComparable<ParsedVersionStr
         Revision = int.Parse(parts[4]);
     }
 
-    public readonly int CompareTo(ParsedVersionString other)
+    public readonly int CompareTo(GameVersion other)
     {
         if (Year != other.Year)
             return Year.CompareTo(other.Year);
@@ -88,8 +88,6 @@ public readonly record struct ParsedVersionString : IComparable<ParsedVersionStr
         var sb = new StringBuilder();
         if (IsHistoric)
             sb.Append('H');
-        else if (format == "P")
-            sb.Append('D');
 
         sb.Append($"{Year:D4}.{Month:D2}.{Day:D2}.{Part:D4}.{Revision:D4}");
         if (Section is not null)
@@ -98,30 +96,30 @@ public readonly record struct ParsedVersionString : IComparable<ParsedVersionStr
         return sb.ToString();
     }
 
-    public bool Equals(ParsedVersionString other) =>
+    public bool Equals(GameVersion other) =>
         CompareTo(other) == 0;
 
     public override readonly int GetHashCode() =>
         HashCode.Combine(Year, Month, Day, Part, Revision, IsHistoric, Section);
 
-    public static bool operator <(ParsedVersionString left, ParsedVersionString right) =>
+    public static bool operator <(GameVersion left, GameVersion right) =>
         left.CompareTo(right) < 0;
 
-    public static bool operator <=(ParsedVersionString left, ParsedVersionString right) =>
+    public static bool operator <=(GameVersion left, GameVersion right) =>
         left.CompareTo(right) <= 0;
 
-    public static bool operator >(ParsedVersionString left, ParsedVersionString right) =>
+    public static bool operator >(GameVersion left, GameVersion right) =>
         left.CompareTo(right) > 0;
 
-    public static bool operator >=(ParsedVersionString left, ParsedVersionString right) =>
+    public static bool operator >=(GameVersion left, GameVersion right) =>
         left.CompareTo(right) >= 0;
 
-    public sealed class JsonConverter : JsonConverter<ParsedVersionString>
+    public sealed class JsonConverter : JsonConverter<GameVersion>
     {
-        public override ParsedVersionString Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        public override GameVersion Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
             new(reader.GetString()!);
 
-        public override void Write(Utf8JsonWriter writer, ParsedVersionString value, JsonSerializerOptions options) =>
+        public override void Write(Utf8JsonWriter writer, GameVersion value, JsonSerializerOptions options) =>
             writer.WriteStringValue(value.ToString());
     }
 }

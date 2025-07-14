@@ -5,10 +5,11 @@ using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Net;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace FFXIVDownloader.Thaliak;
 
-public sealed class ThaliakClient : IDisposable
+public sealed partial class ThaliakClient : IDisposable
 {
     private GraphQLHttpClient Client { get; }
 
@@ -148,8 +149,11 @@ public sealed class ThaliakClient : IDisposable
     public ThaliakClient()
     {
         var serializer = new SystemTextJsonSerializer();
-        serializer.Options.Converters.Add(new GameVersion.JsonConverter());
-        Client = new("https://thaliak.xiv.dev/graphql/2022-08-14", serializer);
+        serializer.Options.TypeInfoResolver = JsonContext.Default;
+        Client = new(new GraphQLHttpClientOptions()
+        {
+            EndPoint = new("https://thaliak.xiv.dev/graphql/2022-08-14")
+        }, serializer);
     }
 
     public async Task<Repository> GetRepositoryMetadataAsync(string slug, CancellationToken token = default)
@@ -166,9 +170,9 @@ public sealed class ThaliakClient : IDisposable
                     }
                 }
             }",
-            Variables = new
+            Variables = new Dictionary<string, string>
             {
-                repoId = slug
+                { "repoId", slug }
             }
         }, token).ConfigureAwait(false)).Data.Repository;
     }
@@ -193,9 +197,9 @@ public sealed class ThaliakClient : IDisposable
                     }
                 }
             }",
-            Variables = new
+            Variables = new Dictionary<string, string>
             {
-                repoId = slug
+                { "repoId", slug }
             }
         }, token).ConfigureAwait(false)).Data.Repository.Versions!;
 
@@ -261,9 +265,9 @@ public sealed class ThaliakClient : IDisposable
                     }
                 }
             }",
-            Variables = new
+            Variables = new Dictionary<string, string>
             {
-                repoId = slug
+                { "repoId", slug }
             }
         }).ConfigureAwait(false)).Data.Repository.Versions!;
 
@@ -320,6 +324,13 @@ public sealed class ThaliakClient : IDisposable
     public void Dispose()
     {
         Client.Dispose();
+    }
+
+    [JsonSerializable(typeof(GraphQLRequest))]
+    [JsonSerializable(typeof(GraphQLResponse<RepositoryResponse>))]
+    [JsonSerializable(typeof(Dictionary<string, string>))]
+    public partial class JsonContext : JsonSerializerContext
+    {
     }
 }
 

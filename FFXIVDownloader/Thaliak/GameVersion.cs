@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace FFXIVDownloader.Thaliak;
 
+[JsonConverter(typeof(JsonConverter))]
 public readonly record struct GameVersion : IComparable<GameVersion>, IEquatable<GameVersion>, IFormattable
 {
     public int Year { get; init; }

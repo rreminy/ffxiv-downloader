@@ -1,8 +1,9 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace FFXIVDownloader.Command;
 
-public sealed record CacheMetadata
+public sealed partial record CacheMetadata
 {
     public List<string> InstalledVersions { get; set; } = [];
     public List<string> FilteredFiles { get; } = [];
@@ -14,7 +15,7 @@ public sealed record CacheMetadata
             return new();
 
         using var stream = File.OpenRead(path);
-        return await JsonSerializer.DeserializeAsync<CacheMetadata>(stream).ConfigureAwait(false) ?? new();
+        return await JsonSerializer.DeserializeAsync(stream, JsonContext.Default.CacheMetadata).ConfigureAwait(false) ?? new();
     }
 
     public async Task WriteAsync(string outputPath)
@@ -23,6 +24,12 @@ public sealed record CacheMetadata
 
         using var stream = File.OpenWrite(path);
         stream.SetLength(0);
-        await JsonSerializer.SerializeAsync(stream, this).ConfigureAwait(false);
+        await JsonSerializer.SerializeAsync(stream, this, JsonContext.Default.CacheMetadata).ConfigureAwait(false);
+    }
+
+    [JsonSerializable(typeof(CacheMetadata))]
+    public partial class JsonContext : JsonSerializerContext
+    {
     }
 }
+

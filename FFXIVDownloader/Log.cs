@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using FFXIVDownloader.Thaliak;
@@ -6,13 +7,6 @@ namespace FFXIVDownloader;
 
 public static class Log
 {
-    static Log()
-    {
-        JsonOptions = new JsonSerializerOptions { WriteIndented = true, IncludeFields = true };
-        JsonOptions.Converters.Add(new GameVersion.JsonConverter());
-        JsonOptions.Converters.Add(new PatchVersion.JsonConverter());
-    }
-
     public static void Error(Exception e)
     {
         Console.Error.WriteLine($"[ERROR] {e}");
@@ -63,8 +57,11 @@ public static class Log
             Console.WriteLine($"[DEBUG] {message}");
     }
 
-    private static JsonSerializerOptions JsonOptions { get; }
-    public static void DebugObject(object value)
+    private static JsonSerializerOptions JsonOptions { get; } = new() { WriteIndented = true, IncludeFields = true };
+
+    [RequiresDynamicCode("JSON serialization and deserialization might require types that cannot be statically analyzed and might need runtime code generation. Use System.Text.Json source generation for native AOT applications.")]
+    [RequiresUnreferencedCode("JSON serialization and deserialization might require types that cannot be statically analyzed. Use the overload that takes a JsonTypeInfo or JsonSerializerContext, or make sure all of the required types are preserved.")]
+    public static void DebugObject<T>(T value)
     {
         if (IsDebugEnabled)
             Console.WriteLine($"[DEBUG] {JsonSerializer.Serialize(value, JsonOptions)}");

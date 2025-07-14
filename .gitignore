@@ -4,5 +4,7 @@ bin/
 build/
 *.user
 
-out-test/
 *.patch
+*.clut
+*.lut
+test_fix.sh

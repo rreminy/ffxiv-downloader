@@ -62,7 +62,7 @@ public sealed class PatchClient : IDisposable
         else
         {
             using var sema = await SemaphoreLock.CreateAsync(ConnectionSemaphore, token).ConfigureAwait(false);
-            var response = await Client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
+            var response = await Client.GetAsync(url, HttpCompletionOption.ResponseContentRead, token).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
         }
@@ -125,7 +125,7 @@ public sealed class PatchClient : IDisposable
         RangeHeaderValue? r1 = null, r2 = null;
         try
         {
-            rsp = await Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
+            rsp = await Client.SendAsync(request, HttpCompletionOption.ResponseContentRead, token).ConfigureAwait(false);
             rsp.EnsureSuccessStatusCode();
         }
         catch (TaskCanceledException)

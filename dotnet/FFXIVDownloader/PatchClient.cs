@@ -128,7 +128,7 @@ public sealed class PatchClient : IDisposable
             rsp = await Client.SendAsync(request, HttpCompletionOption.ResponseContentRead, token).ConfigureAwait(false);
             rsp.EnsureSuccessStatusCode();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException cex) when (cex.InnerException is not TimeoutException)
         {
             throw;
         }
